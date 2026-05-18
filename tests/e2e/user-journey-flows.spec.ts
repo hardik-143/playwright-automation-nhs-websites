@@ -1,5 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { TEST_USER } from "../fixtures/test-data";
+import { TEST_USER, BOOKING_PREFERENCES } from "../fixtures/test-data";
 import { JOURNEY_FLOWS } from "../fixtures/journey-flows";
 import { PHARMACY_SITES } from "../fixtures/pharmacies";
 import {
@@ -32,7 +32,7 @@ function buildFlowConfig(
     conditionJourneyType,
     conditionName: condition.title,
     booking: {
-      appointmentType: "Video",
+      appointmentType: BOOKING_PREFERENCES.appointmentType,
       useNextAvailableSlot: true,
       autoMoveToNextDate: true,
       maxDateAttempts: 10,

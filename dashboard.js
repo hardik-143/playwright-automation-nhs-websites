@@ -228,8 +228,10 @@ function readTestData() {
       securityCode:   getEnv("TD_CARD_CVV"),
     },
     condition: { journeyType },
+    appointment: {
+      appointmentType: getEnv("TD_APPOINTMENT_TYPE") || "Video",
+    },
     booking: {
-      appointmentType:    get("appointmentType"),
       useNextAvailableSlot: getBool("useNextAvailableSlot"),
       preferredMonth:     get("preferredMonth"),
       preferredDate:      get("preferredDate"),
@@ -477,6 +479,7 @@ app.get("/api/run-tests", (req, res) => {
       const u  = td.user     || {};
       const p  = td.payment  || {};
       const sh = td.shipping || {};
+      const a  = td.appointment || {};
       const set = (key, val) => { if (val != null && String(val).trim() !== "") tdEnv[key] = String(val); };
       set("TD_FIRST_NAME",          u.firstName);
       set("TD_LAST_NAME",           u.lastName);
@@ -502,6 +505,7 @@ app.get("/api/run-tests", (req, res) => {
       set("TD_SHIP_POSTCODE",       sh.postalCode);
       set("TD_SHIP_ADDRESS_ACTION", sh.addressAction);
       set("TD_PAYMENT_METHOD",      sh.paymentMethod);
+      set("TD_APPOINTMENT_TYPE",    a.appointmentType);
       set("USER_JOURNEY_CONDITION_ID", td.ujConditionId);
       const overrideCount = Object.keys(tdEnv).length;
       if (overrideCount > 0) {

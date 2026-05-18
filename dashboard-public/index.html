@@ -943,6 +943,21 @@
               </div>
             </div>
 
+            <!-- Appointment -->
+             <div class="td-section collapsed">
+              <div class="td-section-header">📅 Appointment</div>
+              <div class="td-section-body">
+                <div class="td-field">
+                  <label>Session Type</label>
+                  <select id="td-appointmentType" class="td-select">
+                    <option value="Video">Video</option>
+                    <option value="Face to Face">In-Person</option>
+                    <option value="Phone call">Phone Call</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
           </div><!-- end td-body -->
         </div>
 
@@ -1136,9 +1151,11 @@
 
     function tdFillForm(data) {
       tdData = data;
+      console.log("Filling form with data:", data);
       const u = data.user || {};
       const p = data.payment || {};
       const s = data.shipping || {};
+      const a = data.appointment || {};
 
       const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ""; };
       const check = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
@@ -1168,7 +1185,9 @@
       set("td-postalCode",      s.postalCode);
       set("td-addressAction",   s.addressAction);
       set("td-paymentMethod",   s.paymentMethod);
+      set("td-appointmentType", a.appointmentType);
     }
+    
 
     function tdCollectForm() {
       const val = id => (document.getElementById(id) || {}).value || "";
@@ -1191,6 +1210,9 @@
           addressLine1: val("td-addressLine1"), addressLine2: val("td-addressLine2"),
           townCity: val("td-townCity"), postalCode: val("td-postalCode"),
           addressAction: val("td-addressAction"), paymentMethod: val("td-paymentMethod"),
+        },
+        appointment: {
+          appointmentType: val("td-appointmentType"),
         },
       };
     }

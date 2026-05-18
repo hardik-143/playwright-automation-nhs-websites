@@ -6,6 +6,18 @@ const _dobMonth = _e.TD_DOB_MONTH || "01";
 const _dobYear  = _e.TD_DOB_YEAR  || "1990";
 const _gender   = (_e.TD_GENDER   || "male") as "male" | "female";
 
+const _nhsDobDay   = "15";
+const _nhsDobMonth = "04";
+const _nhsDobYear  = "1962";
+const _appointmentType = (_e.TD_APPOINTMENT_TYPE || "Video") as AppointmentType;
+export const NHS_USER = {
+  firstName: "Lloyd",
+  lastName: "Peeney",
+  email: "lloyd.p2@yopmail.com",
+  phone: "447467059973",
+  gender: "male",
+}
+
 export const TEST_USER = {
   gender: _gender,
   dob: {
@@ -127,7 +139,7 @@ export interface BookingPreferences {
 }
 
 export const BOOKING_PREFERENCES: BookingPreferences = {
-  appointmentType: "Video",
+  appointmentType: _appointmentType,
 
   useNextAvailableSlot: true,
 

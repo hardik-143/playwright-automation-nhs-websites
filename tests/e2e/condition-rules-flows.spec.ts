@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { TEST_USER } from "../fixtures/test-data";
+import { TEST_USER, BOOKING_PREFERENCES } from "../fixtures/test-data";
 import { runConditionFlow } from "../helpers/run-flow";
 import { ConditionsListingPage } from "../page-objects/ConditionsListingPage";
 import type { FlowConfig } from "../fixtures/flow-configs";
@@ -41,7 +41,7 @@ const SCENARIOS: ConditionRulesScenario[] = [
     conditionJourneyType: "nhs",
     questionnaireRulesKey: "shingles",
     booking: {
-      appointmentType: "Video",
+      appointmentType: BOOKING_PREFERENCES.appointmentType,
       useNextAvailableSlot: true,
       autoMoveToNextDate: true,
       maxDateAttempts: 10,
@@ -56,7 +56,7 @@ const SCENARIOS: ConditionRulesScenario[] = [
     conditionJourneyType: "private",
     questionnaireRulesKey: "shingles",
     booking: {
-      appointmentType: "Video",
+      appointmentType: BOOKING_PREFERENCES.appointmentType,
       useNextAvailableSlot: true,
       autoMoveToNextDate: true,
       maxDateAttempts: 10,
@@ -71,7 +71,7 @@ const SCENARIOS: ConditionRulesScenario[] = [
     conditionJourneyType: "private",
     questionnaireRulesKey: "weight management",
     booking: {
-      appointmentType: "Video",
+      appointmentType: BOOKING_PREFERENCES.appointmentType,
       useNextAvailableSlot: true,
       autoMoveToNextDate: true,
       maxDateAttempts: 10,
@@ -86,7 +86,7 @@ const SCENARIOS: ConditionRulesScenario[] = [
     conditionJourneyType: "lifestyle",
     questionnaireRulesKey: "erectile-dysfunction",
     booking: {
-      appointmentType: "Video",
+      appointmentType: BOOKING_PREFERENCES.appointmentType,
       useNextAvailableSlot: true,
       autoMoveToNextDate: true,
       maxDateAttempts: 10,
