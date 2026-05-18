@@ -524,30 +524,41 @@
 
       /* Artifacts panel */
       #artifacts-panel {
-        display: none; flex: 1; min-height: 0; overflow-y: auto;
-        padding: 20px; background: var(--clr-main);
-        transition: background var(--transition);
+        display: none; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;
+        padding: 16px 20px; background: var(--clr-main);
+        transition: background var(--transition); gap: 0;
       }
       #artifacts-panel h3 {
-        margin: 0 0 16px; font-size: 13px; font-weight: 700;
-        color: var(--clr-txt); letter-spacing: -0.01em;
+        margin: 0 0 14px; font-size: 11px; font-weight: 700;
+        color: var(--clr-txt-muted); letter-spacing: .07em; text-transform: uppercase;
       }
-      .artifact-section { margin-bottom: 24px; }
-      .artifact-section h4 {
-        font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
-        color: var(--clr-txt-muted); margin: 0 0 10px; font-weight: 700;
+      .artifact-section { margin-bottom: 20px; }
+      .artifact-section-header {
+        display: flex; align-items: center; gap: 8px;
+        margin: 0 0 8px; padding-bottom: 6px;
+        border-bottom: 1px solid var(--clr-border);
+      }
+      .artifact-section-header .asec-icon { font-size: 13px; }
+      .artifact-section-header .asec-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .07em; color: var(--clr-txt-muted);
       }
       .artifact-list { display: flex; flex-direction: column; gap: 6px; }
       .artifact-item {
-        display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+        display: flex; align-items: center; gap: 10px; padding: 9px 12px;
         border: 1px solid var(--clr-border); border-radius: var(--radius-sm);
         background: var(--clr-surface); font-size: 12px; color: var(--clr-txt);
         text-decoration: none; transition: all var(--transition);
       }
       .artifact-item:hover { border-color: var(--clr-accent); background: var(--clr-hover); transform: translateX(2px); }
-      .artifact-item .icon { font-size: 15px; flex-shrink: 0; }
-      .artifact-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .artifact-empty { color: var(--clr-txt-muted); font-size: 12px; padding: 8px 0; }
+      .artifact-item .icon { font-size: 14px; flex-shrink: 0; }
+      .artifact-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .artifact-item .ext-link { font-size: 11px; color: var(--clr-accent); flex-shrink: 0; }
+      .artifact-empty {
+        color: var(--clr-txt-muted); font-size: 12px; padding: 10px 12px;
+        border: 1px dashed var(--clr-border); border-radius: var(--radius-sm);
+        text-align: center;
+      }
 
       /* Loading spinner */
       #loading {
@@ -861,13 +872,19 @@
         <div id="artifacts-panel">
           <h3>Run Artifacts</h3>
           <div class="artifact-section">
-            <h4>📹 Videos</h4>
+            <div class="artifact-section-header">
+              <span class="asec-icon">📹</span>
+              <span class="asec-label">Videos</span>
+            </div>
             <div class="artifact-list" id="artifact-videos">
               <div class="artifact-empty">No videos yet. Run a test first.</div>
             </div>
           </div>
           <div class="artifact-section">
-            <h4>🔍 Traces</h4>
+            <div class="artifact-section-header">
+              <span class="asec-icon">🔍</span>
+              <span class="asec-label">Traces</span>
+            </div>
             <div class="artifact-list" id="artifact-traces">
               <div class="artifact-empty">No traces yet. Run a test first.</div>
             </div>
