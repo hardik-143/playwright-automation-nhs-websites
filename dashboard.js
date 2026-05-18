@@ -213,13 +213,20 @@ function readTestData() {
       lastName:        getEnv("TD_LAST_NAME"),
       postcode:        getEnv("TD_POSTCODE"),
       email:           getEnv("TD_EMAIL"),
+      confirmEmail:    getEnv("TD_CONFIRM_EMAIL") || getEnv("TD_EMAIL"),
       phone:           getEnv("TD_PHONE"),
+      confirmPhone:    getEnv("TD_CONFIRM_PHONE") || getEnv("TD_PHONE"),
       guardianName:    getEnv("TD_GUARDIAN_NAME"),
       dobDay:          getEnv("TD_DOB_DAY"),
       dobMonth:        getEnv("TD_DOB_MONTH"),
       dobYear:         getEnv("TD_DOB_YEAR"),
       password:        getEnv("TD_PASSWORD"),
       confirmPassword: getEnv("TD_CONFIRM_PASSWORD"),
+      triggerContactRecovery: getEnv("TD_TRIGGER_CONTACT_RECOVERY") === "true",
+      newPhone:        getEnv("TD_NEW_PHONE") || getEnv("TD_PHONE"),
+      confirmNewPhone: getEnv("TD_CONFIRM_NEW_PHONE") || getEnv("TD_NEW_PHONE") || getEnv("TD_PHONE"),
+      newEmail:        getEnv("TD_NEW_EMAIL") || getEnv("TD_EMAIL"),
+      confirmNewEmail: getEnv("TD_CONFIRM_NEW_EMAIL") || getEnv("TD_NEW_EMAIL") || getEnv("TD_EMAIL"),
     },
     payment: {
       cardholderName: getEnv("TD_CARD_HOLDER"),
@@ -485,7 +492,9 @@ app.get("/api/run-tests", (req, res) => {
       set("TD_LAST_NAME",           u.lastName);
       set("TD_GENDER",              u.gender);
       set("TD_EMAIL",               u.email);
+      set("TD_CONFIRM_EMAIL",       u.confirmEmail);
       set("TD_PHONE",               u.phone);
+      set("TD_CONFIRM_PHONE",       u.confirmPhone);
       set("TD_POSTCODE",            u.postcode);
       set("TD_GUARDIAN_NAME",       u.guardianName);
       set("TD_PASSWORD",            u.password);
@@ -506,6 +515,11 @@ app.get("/api/run-tests", (req, res) => {
       set("TD_SHIP_ADDRESS_ACTION", sh.addressAction);
       set("TD_PAYMENT_METHOD",      sh.paymentMethod);
       set("TD_APPOINTMENT_TYPE",    a.appointmentType);
+      set("TD_TRIGGER_CONTACT_RECOVERY", String(u.triggerContactRecovery));
+      set("TD_NEW_PHONE",           u.newPhone);
+      set("TD_CONFIRM_NEW_PHONE",   u.confirmNewPhone);
+      set("TD_NEW_EMAIL",           u.newEmail);
+      set("TD_CONFIRM_NEW_EMAIL",   u.confirmNewEmail);
       set("USER_JOURNEY_CONDITION_ID", td.ujConditionId);
       const overrideCount = Object.keys(tdEnv).length;
       if (overrideCount > 0) {
