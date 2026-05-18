@@ -708,7 +708,10 @@ export class SignupPage {
    *     We click the private-consultation link to open the contact-details modal.
    *   - Record matched: contact fields are visible directly (no click needed).
    */
-  async handlePDSResult() {
+  async handlePDSResult(allowRecoveryLinkClick = false) {
+    const shouldClickRecovery =
+      allowRecoveryLinkClick ||
+      process.env.TD_TRIGGER_CONTACT_RECOVERY === "true";
     // Wait up to 45 s for any post-PDS indicator to appear.
     const resultLocator = this.page
       .locator(
@@ -738,20 +741,36 @@ export class SignupPage {
     // Path B: click "I'm no longer using this number or email..."
     const mismatchLink = this.page
       .locator(
-        'span:has-text("I\'m no longer using this number or email, I\'ll enter new contact information.")',
+        [
+          'span[role="button"]:has-text("I\'m no longer using this number or email")',
+          'a:has-text("I\'m no longer using this number or email")',
+          'button:has-text("I\'m no longer using this number or email")',
+          'span:has-text("I\'m no longer using this number or email")',
+        ].join(", "),
       )
       .first();
 
+    let openedByLinkClick = false;
     if (await privateLink.isVisible().catch(() => false)) {
       console.log(
         "[SignupPage] Clicking 'private consultation' link to open modal",
       );
       await privateLink.click();
+      openedByLinkClick = true;
     } else if (await mismatchLink.isVisible().catch(() => false)) {
-      console.log(
-        "[SignupPage] Clicking 'no longer using this number or email' link to open modal",
-      );
-      await mismatchLink.click();
+      if (shouldClickRecovery) {
+        console.log(
+          "[SignupPage] Clicking 'no longer using this number or email' link to open modal",
+        );
+        await mismatchLink.click({ force: true }).catch(async () => {
+          await mismatchLink.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+        });
+        openedByLinkClick = true;
+      } else {
+        console.log(
+          "[SignupPage] Recovery link visible, but auto-click disabled (checkbox not checked)",
+        );
+      }
     }
 
     // If either link was clicked (or if we were already in the right state), 
@@ -764,7 +783,7 @@ export class SignupPage {
       .isVisible({ timeout: 5000 })
       .catch(() => false);
 
-    if (!isModalOpen && (await privateLink.isVisible().catch(() => false) || await mismatchLink.isVisible().catch(() => false))) {
+    if (!isModalOpen && openedByLinkClick) {
         // Wait longer if we just clicked one of them
         await this.page
           .locator(
@@ -793,15 +812,29 @@ export class SignupPage {
     phone: string,
     confirmEmail?: string,
     confirmPhone?: string,
+    opts?: { preferRecoveryModal?: boolean },
   ) {
-    const scope = this.getContactFormScope();
+    const modalScope = this.page
+      .locator('.ant-modal-content:has(input[name="email"])')
+      .first();
+    const inlineScope = this.page
+      .locator('#signupformpart form:has(input[name="email"])')
+      .first();
+
+    let scope = this.getContactFormScope();
+    const preferRecoveryModal = !!opts?.preferRecoveryModal;
+    if (preferRecoveryModal) {
+      if (await modalScope.isVisible().catch(() => false)) scope = modalScope;
+    } else if (await inlineScope.isVisible().catch(() => false)) {
+      scope = inlineScope;
+    }
 
     // Wait for email field to confirm modal/form is ready
     const emailInput = scope.locator('input[name="email"]').first();
     await emailInput.waitFor({ state: "visible", timeout: 20_000 });
     console.log("[SignupPage] Contact-details form ready — starting fill");
 
-    // ── Phone fields (react-phone-number-input renders as .PhoneInputInput) ──
+    // ── Phone fields (target by field names first) ──────────────────────────
     const phoneInputs = scope.locator("input.PhoneInputInput");
     const phoneCount = await phoneInputs.count();
     console.log(`[SignupPage] PhoneInputInput count: ${phoneCount}`);
@@ -814,52 +847,58 @@ export class SignupPage {
       `[SignupPage] Normalized phone for input: "${normalizedPhone}"`,
     );
 
-    // Helper: fill ONE react-phone-number-input field
-    const fillPhoneField = async (idx: number, value: string, label: string) => {
-      const inp = phoneInputs.nth(idx);
+    const setInputValue = async (inp: any, value: string, label: string) => {
+      if (!(await inp.isVisible().catch(() => false))) return false;
       await inp.scrollIntoViewIfNeeded().catch(() => {});
-      await inp.click();
-      await inp.press("Control+a");
-      await this.page.waitForTimeout(50);
-      await inp.press("Backspace");
-      await this.page.waitForTimeout(80);
-      await inp.pressSequentially(value, { delay: 60 });
-      await this.page.waitForTimeout(150);
-
-      // Blur to run field-level Formik validation
-      await inp.press("Tab");
-      await this.page.waitForTimeout(250);
+      await inp.click({ force: true }).catch(() => {});
+      await inp.fill("").catch(() => {});
+      await inp.type(value, { delay: 35 }).catch(async () => {
+        await inp.evaluate((el: HTMLInputElement, val: string) => {
+          el.focus();
+          el.value = "";
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.value = val;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          el.blur();
+        }, value);
+      });
+      await inp.press("Tab").catch(() => {});
+      await this.page.waitForTimeout(120);
 
       const displayed = await inp.inputValue().catch(() => "?");
       console.log(
         `[SignupPage] ${label} display value after fill: "${displayed}"`,
       );
+      return true;
     };
 
-    if (phoneCount >= 1) {
-      await fillPhoneField(0, normalizedPhone, "phone");
-    } else {
-      // Fallback: generic tel input
-      const telInput = scope.locator('input[type="tel"]').first();
-      if (await telInput.isVisible().catch(() => false)) {
-        await telInput.click();
-        await telInput.press("Control+a");
-        await telInput.press("Backspace");
-        await telInput.pressSequentially(normalizedPhone, { delay: 60 });
-        await telInput.press("Tab");
-        const v = await telInput.inputValue().catch(() => "?");
-        console.log(`[SignupPage] tel fallback value: "${v}"`);
-      }
-    }
+    const phoneByName = scope.locator('input[name="phone"]').first();
+    const confirmPhoneByName = scope.locator('input[name="confirmPhone"]').first();
+    const phoneFallback = scope.locator('input[type="tel"]').first();
+    const confirmPhoneFallback = scope.locator('input[type="tel"]').nth(1);
 
-    if (phoneCount >= 2) {
-      await fillPhoneField(1, normalizedConfirmPhone, "confirmPhone");
-    }
+    const phoneFilled =
+      (await setInputValue(phoneByName, normalizedPhone, "phone")) ||
+      (await setInputValue(phoneFallback, normalizedPhone, "phone"));
+    const confirmPhoneFilled =
+      (await setInputValue(confirmPhoneByName, normalizedConfirmPhone, "confirmPhone")) ||
+      (await setInputValue(confirmPhoneFallback, normalizedConfirmPhone, "confirmPhone"));
+    console.log(`[SignupPage] Phone fields filled -> phone=${phoneFilled}, confirmPhone=${confirmPhoneFilled}`);
 
     // ── Email ────────────────────────────────────────────────────────────────
-    await emailInput.click();
-    await emailInput.clear();
-    await emailInput.fill(email);
+    await emailInput.click({ force: true }).catch(() => {});
+    await emailInput.clear().catch(() => {});
+    await emailInput.fill(email).catch(async () => {
+      await emailInput.evaluate((el: HTMLInputElement, val: string) => {
+        el.focus();
+        el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.value = val;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }, email);
+    });
     await emailInput.press("Tab");
     console.log(`[SignupPage] Email filled: "${email}"`);
 
@@ -868,9 +907,19 @@ export class SignupPage {
       .locator('input[name="confirmEmail"]')
       .first();
     if (await confirmEmailInput.isVisible().catch(() => false)) {
-      await confirmEmailInput.click();
-      await confirmEmailInput.clear();
-      await confirmEmailInput.fill(confirmEmail || email);
+      const cEmail = confirmEmail || email;
+      await confirmEmailInput.click({ force: true }).catch(() => {});
+      await confirmEmailInput.clear().catch(() => {});
+      await confirmEmailInput.fill(cEmail).catch(async () => {
+        await confirmEmailInput.evaluate((el: HTMLInputElement, val: string) => {
+          el.focus();
+          el.value = "";
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.value = val;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, cEmail);
+      });
       await confirmEmailInput.press("Tab");
       console.log("[SignupPage] Confirm-email filled");
     }
@@ -904,8 +953,18 @@ export class SignupPage {
    * Click the Confirm button inside the contact-details modal.
    * Waits for the modal to close (success) and waits for redirect to booking page.
    */
-  async submitAndBook() {
-    const scope = this.getContactFormScope();
+  async submitAndBook(allowRecoveryLinkClick = false) {
+    const shouldClickRecovery =
+      allowRecoveryLinkClick ||
+      process.env.TD_TRIGGER_CONTACT_RECOVERY === "true";
+    const recoveryModalScope = this.page
+      .locator('.ant-modal-content:has-text("Enter your new contact details")')
+      .first();
+    const scope =
+      shouldClickRecovery &&
+      (await recoveryModalScope.isVisible().catch(() => false))
+        ? recoveryModalScope
+        : this.getContactFormScope();
     const submitCandidates = [
       "button.button-primary",
       ".ant-modal-footer button",
@@ -1034,7 +1093,9 @@ export class SignupPage {
       );
 
     const currentUrl = this.page.url();
-    await submitButton.click({ force: true });
+    await submitButton.click({ force: true }).catch(async () => {
+      await submitButton.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+    });
     console.log("[SignupPage] Clicked Confirm/submit — waiting for next state");
 
     await Promise.race([
@@ -1057,6 +1118,32 @@ export class SignupPage {
 
     console.log(`[SignupPage] URL after submit: ${this.page.url()}`);
 
+    // If recovery popup is expected but still open, retry popup confirm once.
+    const recoveryModalStillOpen =
+      shouldClickRecovery &&
+      (await recoveryModalScope.isVisible().catch(() => false));
+    if (recoveryModalStillOpen) {
+      const modalConfirm = recoveryModalScope
+        .locator('button:has-text("Confirm"), .sticky-questionnaire-footer button')
+        .first();
+      if (await modalConfirm.isVisible().catch(() => false)) {
+        console.log("[SignupPage] Recovery modal still open — retrying popup Confirm");
+        await modalConfirm.click({ force: true }).catch(async () => {
+          await modalConfirm.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+        });
+        await Promise.race([
+          recoveryModalScope.waitFor({ state: "hidden", timeout: 15_000 }).catch(() => {}),
+          this.page
+            .locator(
+              '.appointment-type-radio-group, .rota-slot, button:has-text("Book Now")',
+            )
+            .first()
+            .waitFor({ state: "visible", timeout: 15_000 })
+            .catch(() => {}),
+        ]);
+      }
+    }
+
     let stillOnSignup = await scope
       .locator(
         'input[name="email"], input[name="first_name"], input.PhoneInputInput',
@@ -1066,6 +1153,36 @@ export class SignupPage {
       .catch(() => false);
 
     if (stillOnSignup) {
+      const mismatchLink = this.page
+        .locator(
+          [
+            'span[role="button"]:has-text("I\'m no longer using this number or email")',
+            'a:has-text("I\'m no longer using this number or email")',
+            'button:has-text("I\'m no longer using this number or email")',
+            'span:has-text("I\'m no longer using this number or email")',
+          ].join(", "),
+        )
+        .first();
+      const mismatchVisible = await mismatchLink.isVisible().catch(() => false);
+      if (mismatchVisible && shouldClickRecovery) {
+        console.log(
+          "[SignupPage] Mismatch after submit and recovery enabled - clicking recovery link",
+        );
+        await mismatchLink.click({ force: true }).catch(async () => {
+          await mismatchLink
+            .evaluate((el: HTMLElement) => el.click())
+            .catch(() => {});
+        });
+        await this.page
+          .locator(
+            ".ant-modal-body input.PhoneInputInput, .ant-modal-content input.PhoneInputInput, .ant-modal input.PhoneInputInput",
+          )
+          .first()
+          .waitFor({ state: "visible", timeout: 20_000 });
+        console.log("[SignupPage] Recovery popup opened after submit");
+        return;
+      }
+
       const form = scope.locator("form").first();
       if (await form.isVisible().catch(() => false)) {
         console.log(
