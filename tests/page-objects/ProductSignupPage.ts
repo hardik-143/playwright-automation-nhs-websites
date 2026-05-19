@@ -116,6 +116,7 @@ export class ProductSignupPage {
     confirmPassword: string;
     confirmPhone?: string;
     confirmEmail?: string;
+    country?: string;
   }): Promise<boolean> {
     const visible = await this.page
       .locator("text=/enter your contact details/i")
@@ -123,6 +124,31 @@ export class ProductSignupPage {
       .isVisible({ timeout: 800 })
       .catch(() => false);
     if (!visible) return false;
+
+    // ── Country Selection ───────────────────────────────────────────────────
+    if (data.country) {
+      console.log(`[ProductSignupPage] Attempting to select country: "${data.country}"`);
+      const countrySelects = this.page.locator("select.PhoneInputCountrySelect");
+      const count = await countrySelects.count();
+      for (let i = 0; i < count; i++) {
+        const select = countrySelects.nth(i);
+        await select.evaluate((el: HTMLSelectElement, targetLabel: string) => {
+          const option = Array.from(el.options).find(o => o.text.trim().toLowerCase() === targetLabel.toLowerCase() || o.label.trim().toLowerCase() === targetLabel.toLowerCase());
+          if (!option) return;
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+          if (nativeSetter) {
+            nativeSetter.call(el, option.value);
+          } else {
+            el.value = option.value;
+          }
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, data.country).catch(() => {});
+        
+        await select.selectOption({ label: data.country }, { force: true, timeout: 1000 }).catch(() => {});
+      }
+      await this.page.waitForTimeout(500);
+    }
 
     const normalizedPhone = this.normalizeUkPhoneForInput(data.phone);
     const normalizedConfirmPhone = data.confirmPhone
@@ -200,6 +226,7 @@ export class ProductSignupPage {
     confirmPassword: string;
     confirmPhone?: string;
     confirmEmail?: string;
+    country?: string;
   }): Promise<boolean> {
     if (!(await this.isVisible())) return false;
 
@@ -219,6 +246,7 @@ export class ProductSignupPage {
       confirmPassword: data.confirmPassword,
       confirmPhone: data.confirmPhone,
       confirmEmail: data.confirmEmail,
+      country: data.country,
     });
 
     return handledPersonal || handledContact;

@@ -214,6 +214,7 @@ function readTestData() {
       postcode:        getEnv("TD_POSTCODE"),
       email:           getEnv("TD_EMAIL"),
       confirmEmail:    getEnv("TD_CONFIRM_EMAIL") || getEnv("TD_EMAIL"),
+      country:         getEnv("TD_COUNTRY"),
       phone:           getEnv("TD_PHONE"),
       confirmPhone:    getEnv("TD_CONFIRM_PHONE") || getEnv("TD_PHONE"),
       guardianName:    getEnv("TD_GUARDIAN_NAME"),
@@ -493,6 +494,7 @@ app.get("/api/run-tests", (req, res) => {
       set("TD_GENDER",              u.gender);
       set("TD_EMAIL",               u.email);
       set("TD_CONFIRM_EMAIL",       u.confirmEmail);
+      set("TD_COUNTRY",             u.country);
       set("TD_PHONE",               u.phone);
       set("TD_CONFIRM_PHONE",       u.confirmPhone);
       set("TD_POSTCODE",            u.postcode);

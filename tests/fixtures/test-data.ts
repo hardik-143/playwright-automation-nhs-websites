@@ -38,6 +38,7 @@ export const TEST_USER = {
   email: _e.TD_EMAIL || "lloyd.p2@yopmail.com",
   confirmEmail: _e.TD_CONFIRM_EMAIL || _e.TD_EMAIL || "lloyd.p2@yopmail.com",
   guardianName: _e.TD_GUARDIAN_NAME || "Tonny stark",
+  country: _e.TD_COUNTRY || "United Kingdom",
   phone: _e.TD_PHONE || "447467059973",
   confirmPhone: _e.TD_CONFIRM_PHONE || _e.TD_PHONE || "447467059973",
   newPhone: _e.TD_NEW_PHONE || _e.TD_PHONE || "447467059973",

@@ -31,6 +31,7 @@ export class SignupPage {
     confirmPassword: string;
     confirmPhone?: string;
     confirmEmail?: string;
+    country?: string;
   }): Promise<boolean> {
     const contactUi = await this.page
       .locator('text=/enter your contact details/i')
@@ -45,6 +46,7 @@ export class SignupPage {
         confirmPassword: data.confirmPassword,
         confirmPhone: data.confirmPhone,
         confirmEmail: data.confirmEmail,
+        country: data.country,
       });
     }
 
@@ -176,6 +178,7 @@ export class SignupPage {
     confirmPassword: string;
     confirmPhone?: string;
     confirmEmail?: string;
+    country?: string;
   }): Promise<boolean> {
     const titleVisible = await this.page
       .locator('text=/enter your contact details/i')
@@ -184,6 +187,31 @@ export class SignupPage {
       .catch(() => false);
 
     if (!titleVisible) return false;
+
+    // ── Country Selection ───────────────────────────────────────────────────
+    if (data.country) {
+      console.log(`[SignupPage] Attempting to select country in lifestyle flow: "${data.country}"`);
+      const countrySelects = this.page.locator("select.PhoneInputCountrySelect");
+      const count = await countrySelects.count();
+      for (let i = 0; i < count; i++) {
+        const select = countrySelects.nth(i);
+        await select.evaluate((el: HTMLSelectElement, targetLabel: string) => {
+          const option = Array.from(el.options).find(o => o.text.trim().toLowerCase() === targetLabel.toLowerCase() || o.label.trim().toLowerCase() === targetLabel.toLowerCase());
+          if (!option) return;
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+          if (nativeSetter) {
+            nativeSetter.call(el, option.value);
+          } else {
+            el.value = option.value;
+          }
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, data.country).catch(() => {});
+        
+        await select.selectOption({ label: data.country }, { force: true, timeout: 1000 }).catch(() => {});
+      }
+      await this.page.waitForTimeout(500);
+    }
 
     const normalizedPhone = this.normalizeUkPhoneForInput(data.phone);
     const normalizedConfirmPhone = data.confirmPhone
@@ -812,7 +840,7 @@ export class SignupPage {
     phone: string,
     confirmEmail?: string,
     confirmPhone?: string,
-    opts?: { preferRecoveryModal?: boolean },
+    opts?: { preferRecoveryModal?: boolean; country?: string },
   ) {
     const modalScope = this.page
       .locator('.ant-modal-content:has(input[name="email"])')
@@ -833,6 +861,35 @@ export class SignupPage {
     const emailInput = scope.locator('input[name="email"]').first();
     await emailInput.waitFor({ state: "visible", timeout: 20_000 });
     console.log("[SignupPage] Contact-details form ready — starting fill");
+
+    // ── Country Selection ───────────────────────────────────────────────────
+    if (opts?.country) {
+      console.log(`[SignupPage] Attempting to select country: "${opts.country}"`);
+      // Target all country selects within the scope (usually one for phone, one for confirmPhone)
+      const countrySelects = scope.locator("select.PhoneInputCountrySelect");
+      const count = await countrySelects.count();
+      console.log(`[SignupPage] Found ${count} country selects`);
+
+      for (let i = 0; i < count; i++) {
+        const select = countrySelects.nth(i);
+        await select.evaluate((el: HTMLSelectElement, targetLabel: string) => {
+          const option = Array.from(el.options).find(o => o.text.trim().toLowerCase() === targetLabel.toLowerCase() || o.label.trim().toLowerCase() === targetLabel.toLowerCase());
+          if (!option) return;
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+          if (nativeSetter) {
+            nativeSetter.call(el, option.value);
+          } else {
+            el.value = option.value;
+          }
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, opts.country).catch(() => {});
+        
+        await select.selectOption({ label: opts.country }, { force: true, timeout: 1000 }).catch(() => {});
+      }
+      // Give the UI a moment to update the flags and phone prefix
+      await this.page.waitForTimeout(500);
+    }
 
     // ── Phone fields (target by field names first) ──────────────────────────
     const phoneInputs = scope.locator("input.PhoneInputInput");

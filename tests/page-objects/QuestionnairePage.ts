@@ -67,21 +67,35 @@ export class QuestionnairePage {
       await this.page.waitForTimeout(200);
 
       if (await this.isOnDrugSelectionPage()) {
-        console.log("[QuestionnairePage] Drug selection UI detected — exiting questionnaire handler");
+        console.log(
+          "[QuestionnairePage] Drug selection UI detected — exiting questionnaire handler",
+        );
         return;
       }
       if (await this.isOnPaymentPage()) {
-        console.log("[QuestionnairePage] Payment UI detected — exiting questionnaire handler");
+        console.log(
+          "[QuestionnairePage] Payment UI detected — exiting questionnaire handler",
+        );
         return;
       }
       if (await this.isOnSignupOrBookingPage()) return;
 
       // Review screen: defer to Confirm click
       const onReviewScreen =
-        (await this.page.locator('button:has-text("Edit Questionnaire")').first().isVisible().catch(() => false)) &&
-        (await this.page.locator('button:has-text("Confirm")').first().isVisible().catch(() => false));
+        (await this.page
+          .locator('button:has-text("Edit Questionnaire")')
+          .first()
+          .isVisible()
+          .catch(() => false)) &&
+        (await this.page
+          .locator('button:has-text("Confirm")')
+          .first()
+          .isVisible()
+          .catch(() => false));
       if (onReviewScreen) {
-        console.log("[QuestionnairePage] Questionnaire review screen detected — deferring to Confirm click");
+        console.log(
+          "[QuestionnairePage] Questionnaire review screen detected — deferring to Confirm click",
+        );
         await this.progressQuestionnaire();
         continue;
       }
@@ -943,11 +957,7 @@ export class QuestionnairePage {
     // keep heading matching strict to prevent broad container matches that can
     // make multiple input rules target the same field.
     return this.page
-      .locator(
-        [".questions", ".question-title"].join(
-          ", ",
-        ),
-      )
+      .locator([".questions", ".question-title"].join(", "))
       .filter({ hasText: pattern })
       .first();
   }
@@ -1108,8 +1118,8 @@ export class QuestionnairePage {
     if ((await radios.count()) > 0) {
       const wrappers = this.page.locator(
         [
-          '.ant-radio-wrapper:not(.ant-radio-wrapper-disabled)',
-          '.ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled)',
+          ".ant-radio-wrapper:not(.ant-radio-wrapper-disabled)",
+          ".ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled)",
           'label:has(input[type="radio"]:not([disabled]))',
         ].join(", "),
       );
@@ -1231,7 +1241,9 @@ export class QuestionnairePage {
       }
       return true;
     }
-    const rawCheckboxes = this.page.locator('input[type="checkbox"]:not([disabled])');
+    const rawCheckboxes = this.page.locator(
+      'input[type="checkbox"]:not([disabled])',
+    );
     const rawCbCount = await rawCheckboxes.count().catch(() => 0);
     if (rawCbCount > 0) {
       if (this.shouldUseRandomAnswers()) {
@@ -1240,11 +1252,17 @@ export class QuestionnairePage {
           .sort(() => Math.random() - 0.5)
           .slice(0, numToSelect);
         for (const i of indices) {
-          await rawCheckboxes.nth(i).check({ force: true }).catch(() => {});
+          await rawCheckboxes
+            .nth(i)
+            .check({ force: true })
+            .catch(() => {});
           await this.page.waitForTimeout(200);
         }
       } else {
-        await rawCheckboxes.nth(0).check({ force: true }).catch(() => {});
+        await rawCheckboxes
+          .nth(0)
+          .check({ force: true })
+          .catch(() => {});
         await this.page.waitForTimeout(200);
       }
       return true;
@@ -1256,7 +1274,10 @@ export class QuestionnairePage {
     );
     if (
       (await numberInput.isVisible().catch(() => false)) &&
-      (await numberInput.first().isEnabled().catch(() => false))
+      (await numberInput
+        .first()
+        .isEnabled()
+        .catch(() => false))
     ) {
       const count = await numberInput.count();
       if (count >= 2) {
@@ -1286,7 +1307,10 @@ export class QuestionnairePage {
     );
     if (
       (await textInput.isVisible().catch(() => false)) &&
-      (await textInput.first().isEnabled().catch(() => false))
+      (await textInput
+        .first()
+        .isEnabled()
+        .catch(() => false))
     ) {
       await textInput.first().click();
       await textInput.first().clear();
@@ -1297,7 +1321,9 @@ export class QuestionnairePage {
     // Date picker (Ant Design)
     const datePicker = this.page.locator(".ant-picker input").first();
     if (await datePicker.isVisible().catch(() => false)) {
-      return this.fillDateByRule(this.shouldUseRandomAnswers() ? this.randomDate() : "1990-01-01");
+      return this.fillDateByRule(
+        this.shouldUseRandomAnswers() ? this.randomDate() : "1990-01-01",
+      );
     }
 
     return false;
@@ -1672,7 +1698,9 @@ export class QuestionnairePage {
     await this.page.waitForLoadState("networkidle").catch(() => {});
     // Wait for popup to fully close before returning so the next iteration
     // doesn't re-detect a partially-animated modal.
-    await popupRoot.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+    await popupRoot
+      .waitFor({ state: "hidden", timeout: 5_000 })
+      .catch(() => {});
     return true;
   }
 
@@ -1708,7 +1736,10 @@ export class QuestionnairePage {
     // Here we just pick the right generic path based on page structure.
 
     // No wrapper structure at all → legacy single-question path
-    const wrapperCount = await this.page.locator(".questionnaire-answer-wrapper").count().catch(() => 0);
+    const wrapperCount = await this.page
+      .locator(".questionnaire-answer-wrapper")
+      .count()
+      .catch(() => 0);
     if (wrapperCount === 0) {
       return (await this.answerCurrentQuestion()) ? 1 : 0;
     }
@@ -1739,7 +1770,9 @@ export class QuestionnairePage {
 
       // Skip groups where an option is already selected
       const checkedCount = await group
-        .locator(".ant-radio-wrapper-checked, .ant-radio-button-wrapper-checked, input[type='radio']:checked")
+        .locator(
+          ".ant-radio-wrapper-checked, .ant-radio-button-wrapper-checked, input[type='radio']:checked",
+        )
         .count()
         .catch(() => 0);
       if (checkedCount > 0) continue;
@@ -1750,7 +1783,9 @@ export class QuestionnairePage {
       const optCount = await options.count().catch(() => 0);
       if (!optCount) continue;
 
-      console.log(`[QuestionnairePage] Answering radio group ${i + 1}/${groupCount} (attempt ${this.retryAttempt})`);
+      console.log(
+        `[QuestionnairePage] Answering radio group ${i + 1}/${groupCount} (attempt ${this.retryAttempt})`,
+      );
       return this.pickRadioOptionByAttempt(options, optCount);
     }
 
@@ -1763,12 +1798,16 @@ export class QuestionnairePage {
       if (!(await group.isVisible().catch(() => false))) continue;
 
       const checkedCount = await group
-        .locator(".ant-checkbox-wrapper-checked, input[type='checkbox']:checked")
+        .locator(
+          ".ant-checkbox-wrapper-checked, input[type='checkbox']:checked",
+        )
         .count()
         .catch(() => 0);
       if (checkedCount > 0) continue;
 
-      const options = group.locator(".ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled)");
+      const options = group.locator(
+        ".ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled)",
+      );
       const optCount = await options.count().catch(() => 0);
       if (!optCount) continue;
 
@@ -1782,7 +1821,9 @@ export class QuestionnairePage {
           const opt = options.nth(idx);
           if (await opt.isVisible().catch(() => false)) {
             await opt.scrollIntoViewIfNeeded().catch(() => {});
-            await opt.click({ force: true }).catch(async () => { await opt.evaluate((el: HTMLElement) => el.click()); });
+            await opt.click({ force: true }).catch(async () => {
+              await opt.evaluate((el: HTMLElement) => el.click());
+            });
             await this.page.waitForTimeout(300);
           }
         }
@@ -1795,7 +1836,9 @@ export class QuestionnairePage {
           if (/none of the above/i.test(text ?? "")) {
             if (await opt.isVisible().catch(() => false)) {
               await opt.scrollIntoViewIfNeeded().catch(() => {});
-              await opt.click({ force: true }).catch(async () => { await opt.evaluate((el: HTMLElement) => el.click()); });
+              await opt.click({ force: true }).catch(async () => {
+                await opt.evaluate((el: HTMLElement) => el.click());
+              });
               await this.page.waitForTimeout(300);
               selectedSafe = true;
               break;
@@ -1806,7 +1849,9 @@ export class QuestionnairePage {
           const first = options.nth(0);
           if (await first.isVisible().catch(() => false)) {
             await first.scrollIntoViewIfNeeded().catch(() => {});
-            await first.click({ force: true }).catch(async () => { await first.evaluate((el: HTMLElement) => el.click()); });
+            await first.click({ force: true }).catch(async () => {
+              await first.evaluate((el: HTMLElement) => el.click());
+            });
             await this.page.waitForTimeout(300);
           }
         }
@@ -1840,7 +1885,9 @@ export class QuestionnairePage {
       const value = (await input.inputValue().catch(() => "")) ?? "";
       if (value.trim()) continue; // already filled
       console.log(`[QuestionnairePage] Filling date picker ${i + 1}`);
-      return this.fillDateByRule(this.shouldUseRandomAnswers() ? this.randomDate() : "01-01-2020");
+      return this.fillDateByRule(
+        this.shouldUseRandomAnswers() ? this.randomDate() : "01-01-2020",
+      );
     }
 
     // ── Number inputs ───────────────────────────────────────────────────────
@@ -1854,7 +1901,10 @@ export class QuestionnairePage {
       const value = (await input.inputValue().catch(() => "")) ?? "";
       if (value.trim()) continue;
       const nearText = await input
-        .evaluate((el: Element) => el.closest(".questionnaire-answer-wrapper")?.textContent ?? "")
+        .evaluate(
+          (el: Element) =>
+            el.closest(".questionnaire-answer-wrapper")?.textContent ?? "",
+        )
         .catch(() => "");
       const val = /height/i.test(nearText) ? "170" : "70";
       await input.scrollIntoViewIfNeeded().catch(() => {});
@@ -1866,7 +1916,7 @@ export class QuestionnairePage {
     // ── Text inputs / textareas ─────────────────────────────────────────────
     const textInputs = this.page.locator(
       ".questionnaire-answer-wrapper:visible input[type='text']:not([disabled]):not([name='first_name']):not([name='last_name']):not([name='postcode'])," +
-      " .questionnaire-answer-wrapper:visible textarea:not([disabled])",
+        " .questionnaire-answer-wrapper:visible textarea:not([disabled])",
     );
     const txtCount = await textInputs.count().catch(() => 0);
     for (let i = 0; i < txtCount; i++) {
@@ -1875,8 +1925,31 @@ export class QuestionnairePage {
       if (!(await input.isEnabled().catch(() => false))) continue;
       const value = (await input.inputValue().catch(() => "")) ?? "";
       if (value.trim()) continue;
+      const placeholder =
+        (await input.getAttribute("placeholder").catch(() => "")) || "";
+      const nearText = await input
+        .evaluate(
+          (el: Element) =>
+            el.closest(".questionnaire-answer-wrapper")?.textContent ?? "",
+        )
+        .catch(() => "");
+      const combined = (placeholder + " " + nearText).toLowerCase();
+
+      let val = "None";
+      // Handle range/scale patterns: "scale 1-10", "range 1-10", "(1-10)"
+      const rangeMatch =
+        combined.match(/(?:scale|range|between)\s*(\d+)\s*-\s*(\d+)/i) ||
+        combined.match(/\((\d+)\s*-\s*(\d+)\)/);
+      if (rangeMatch) {
+        const min = parseInt(rangeMatch[1], 10);
+        const max = parseInt(rangeMatch[2], 10);
+        if (!isNaN(min) && !isNaN(max) && max > min) {
+          val = Math.floor((min + max) / 2).toString();
+        }
+      }
+
       await input.scrollIntoViewIfNeeded().catch(() => {});
-      await input.fill("None").catch(() => {});
+      await input.fill(val).catch(() => {});
       return true;
     }
 
@@ -1896,7 +1969,9 @@ export class QuestionnairePage {
       const opt = options.nth(idx);
       if (await opt.isVisible().catch(() => false)) {
         await opt.scrollIntoViewIfNeeded().catch(() => {});
-        await opt.click({ force: true }).catch(async () => { await opt.evaluate((el: HTMLElement) => el.click()); });
+        await opt.click({ force: true }).catch(async () => {
+          await opt.evaluate((el: HTMLElement) => el.click());
+        });
         await this.page.waitForTimeout(300);
         return true;
       }
@@ -1921,7 +1996,9 @@ export class QuestionnairePage {
           if (pattern.test(text ?? "")) {
             if (await opt.isVisible().catch(() => false)) {
               await opt.scrollIntoViewIfNeeded().catch(() => {});
-              await opt.click({ force: true }).catch(async () => { await opt.evaluate((el: HTMLElement) => el.click()); });
+              await opt.click({ force: true }).catch(async () => {
+                await opt.evaluate((el: HTMLElement) => el.click());
+              });
               await this.page.waitForTimeout(300);
               return true;
             }
@@ -1933,7 +2010,9 @@ export class QuestionnairePage {
     const opt = options.nth(idx);
     if (await opt.isVisible().catch(() => false)) {
       await opt.scrollIntoViewIfNeeded().catch(() => {});
-      await opt.click({ force: true }).catch(async () => { await opt.evaluate((el: HTMLElement) => el.click()); });
+      await opt.click({ force: true }).catch(async () => {
+        await opt.evaluate((el: HTMLElement) => el.click());
+      });
       await this.page.waitForTimeout(300);
       return true;
     }
