@@ -792,7 +792,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "dashboard-public/index.html"));
 });
 
-const PORT = 7890;
+const PORT = 5002;
 app.listen(PORT, () => {
   console.log(`\n  Dashboard running at http://localhost:${PORT}\n`);
 });

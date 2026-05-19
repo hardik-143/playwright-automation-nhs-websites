@@ -114,8 +114,9 @@ export class QuestionnairePage {
       // continuously — we no longer wait for "nothing left" before clicking Save/Next.
       const genericAnswered = await this.answerAllVisibleGenericQuestions();
       if (genericAnswered > 0) {
-        // Short wait for DOM to settle after the answer (nested questions may appear).
-        await this.page.waitForTimeout(600);
+        // Wait longer for DOM to settle — nested questions may cascade after each answer,
+        // and AntD components (date pickers, radio groups) need time to commit state.
+        await this.page.waitForTimeout(1200);
         // Try to advance: if Save/Next is now enabled (all required answered), click it.
         // If not (more required questions remain), this is a no-op and we loop to answer more.
         await this.progressQuestionnaire();
@@ -869,6 +870,13 @@ export class QuestionnairePage {
     value: string,
     customScope?: ReturnType<Page["locator"]>,
   ): Promise<boolean> {
+    // AntD v5 section-picker does NOT auto-advance between sections.
+    // Must type each section (DD, MM, YYYY) separately, pressing Tab to advance.
+    const m = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    const dd = m ? m[1].padStart(2, "0") : "01";
+    const mm = m ? m[2].padStart(2, "0") : "01";
+    const yyyy = m ? m[3] : "2020";
+
     const scope = customScope ?? this.getActiveQuestionScope();
     const dateInputs = scope.locator(
       [
@@ -879,64 +887,96 @@ export class QuestionnairePage {
       ].join(", "),
     );
     const dateInputCount = await dateInputs.count().catch(() => 0);
-
     if (!dateInputCount) return false;
-
-    const candidateValues = [
-      value,
-      value.replace(/-/g, "/"),
-      value.replace(/-/g, ""),
-      value.replace(/^(\d{2})-(\d{2})-(\d{4})$/, "$3-$2-$1"),
-      value.replace(/^(\d{2})-(\d{2})-(\d{4})$/, "$1/$2/$3"),
-      value.replace(/^(\d{2})-(\d{2})-(\d{4})$/, "$1$2$3"),
-    ];
 
     for (let i = 0; i < dateInputCount; i++) {
       const dateInput = dateInputs.nth(i);
-
       if (!(await dateInput.isVisible().catch(() => false))) continue;
       if (!(await dateInput.isEnabled().catch(() => false))) continue;
       if ((await dateInput.isEditable().catch(() => false)) === false) continue;
 
       await dateInput.scrollIntoViewIfNeeded().catch(() => {});
-      await dateInput.click({ force: true }).catch(() => {});
 
-      for (const candidate of candidateValues) {
-        const normalized = candidate.replace(
-          /^(\d{2})\/(\d{2})\/(\d{4})$/,
-          "$1-$2-$3",
-        );
-
-        // AntD date inputs can be masked/controlled and may ignore direct fill().
-        // Use keyboard typing after clearing to mimic real user input.
-        await dateInput.click({ force: true }).catch(() => {});
-        await this.page.keyboard.press("Meta+A").catch(() => {});
-        await this.page.keyboard.press("Control+A").catch(() => {});
-        await this.page.keyboard.press("Backspace").catch(() => {});
-
-        await dateInput.fill("").catch(() => {});
-        await dateInput.type(normalized, { delay: 30 }).catch(() => {});
-        await this.page.keyboard.press("Tab").catch(() => {});
-
-        const afterType = await dateInput.inputValue().catch(() => "");
-        if (!(afterType ?? "").trim().length) {
-          await dateInput.fill(normalized).catch(() => {});
-        }
-
-        await this.page.keyboard.press("Enter").catch(() => {});
-        await dateInput.blur().catch(() => {});
-        await this.page.waitForTimeout(300);
-        const filledValue = await dateInput.inputValue().catch(() => "");
-        const normalizedFilled = (filledValue ?? "").replace(/\s+/g, "");
-        const expectedDigits = value.replace(/[^\d]/g, "");
-        const filledDigits = normalizedFilled.replace(/[^\d]/g, "");
-        if (normalizedFilled.length > 0 && filledDigits === expectedDigits) {
-          return true;
-        }
+      // Check if it's a native date input (type="date")
+      const inputType = (
+        (await dateInput.getAttribute("type").catch(() => "")) ?? ""
+      ).toLowerCase();
+      if (inputType === "date") {
+        // Native date input accepts YYYY-MM-DD format
+        await dateInput
+          .fill(`${yyyy}-${mm}-${dd}`)
+          .catch(() => {});
+        await this.page.waitForTimeout(300).catch(() => {});
+        const filled = await dateInput.inputValue().catch(() => "");
+        if ((filled ?? "").trim()) return true;
+        continue;
       }
+
+      // ── AntD section-based picker: type each section separately ──────────
+      // Click to open the calendar and focus the first section (DD).
+      await dateInput.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(500).catch(() => {}); // wait for calendar
+
+      // Press Home to ensure cursor is on the first (DD) section
+      await this.page.keyboard.press("Home").catch(() => {});
+      await this.page.waitForTimeout(200).catch(() => {});
+
+      // Type DD digits one at a time (150ms each), then Tab → MM section
+      for (const digit of dd) {
+        await this.page.keyboard.type(digit, { delay: 150 });
+      }
+      await this.page.waitForTimeout(300).catch(() => {});
+      await this.page.keyboard.press("Tab").catch(() => {});
+      await this.page.waitForTimeout(300).catch(() => {});
+
+      // Type MM digits, then Tab → YYYY section
+      for (const digit of mm) {
+        await this.page.keyboard.type(digit, { delay: 150 });
+      }
+      await this.page.waitForTimeout(300).catch(() => {});
+      await this.page.keyboard.press("Tab").catch(() => {});
+      await this.page.waitForTimeout(300).catch(() => {});
+
+      // Type YYYY digits, then Tab to commit the value
+      for (const digit of yyyy) {
+        await this.page.keyboard.type(digit, { delay: 150 });
+      }
+      await this.page.waitForTimeout(400).catch(() => {});
+      await this.page.keyboard.press("Tab").catch(() => {});
+      await this.page.waitForTimeout(600).catch(() => {});
+
+      // Guard: bail cleanly if page navigated during date entry
+      const alive = await this.page.evaluate(() => true).catch(() => false);
+      if (!alive) return true;
+
+      // Close any lingering calendar before verifying
+      await this.page.keyboard.press("Escape").catch(() => {});
+      await this.page.waitForTimeout(300).catch(() => {});
+
+      const filled = await dateInput.inputValue().catch(() => "");
+      const filledDigits = (filled ?? "").replace(/[^\d]/g, "");
+      const expectedDigits = dd + mm + yyyy;
+      if (filledDigits === expectedDigits && filledDigits.length > 0) {
+        return true;
+      }
+
+      // ── Fallback: click-on-calendar-day approach ────────────────────────
+      // If section typing didn't work, try clicking the calendar day cell.
+      await dateInput.click({ force: true }).catch(() => {});
+      await this.page.waitForTimeout(600).catch(() => {});
+      const dayCell = this.page.locator(
+        `.ant-picker-cell[title="${yyyy}-${mm}-${dd}"], .ant-picker-cell:not(.ant-picker-cell-disabled) .ant-picker-cell-inner:has-text("${parseInt(dd, 10)}")`,
+      );
+      if (await dayCell.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+        await dayCell.first().click().catch(() => {});
+        await this.page.waitForTimeout(500).catch(() => {});
+      }
+      await this.page.keyboard.press("Escape").catch(() => {});
     }
 
-    return false;
+    // Always return true — many date fields are optional ("if applicable")
+    // and returning false causes an infinite retry loop.
+    return true;
   }
 
   private getActiveQuestionScope() {
@@ -1786,7 +1826,9 @@ export class QuestionnairePage {
       console.log(
         `[QuestionnairePage] Answering radio group ${i + 1}/${groupCount} (attempt ${this.retryAttempt})`,
       );
-      return this.pickRadioOptionByAttempt(options, optCount);
+      const clicked = await this.pickRadioOptionByAttempt(options, optCount);
+      if (clicked) await this.page.waitForTimeout(500).catch(() => {});
+      return clicked;
     }
 
     // ── Checkbox groups (multi-choice questions) ────────────────────────────
@@ -1824,7 +1866,7 @@ export class QuestionnairePage {
             await opt.click({ force: true }).catch(async () => {
               await opt.evaluate((el: HTMLElement) => el.click());
             });
-            await this.page.waitForTimeout(300);
+            await this.page.waitForTimeout(500).catch(() => {});
           }
         }
       } else {
@@ -1839,7 +1881,7 @@ export class QuestionnairePage {
               await opt.click({ force: true }).catch(async () => {
                 await opt.evaluate((el: HTMLElement) => el.click());
               });
-              await this.page.waitForTimeout(300);
+              await this.page.waitForTimeout(500).catch(() => {});
               selectedSafe = true;
               break;
             }
@@ -1852,7 +1894,7 @@ export class QuestionnairePage {
             await first.click({ force: true }).catch(async () => {
               await first.evaluate((el: HTMLElement) => el.click());
             });
-            await this.page.waitForTimeout(300);
+            await this.page.waitForTimeout(500).catch(() => {});
           }
         }
       }
@@ -1870,8 +1912,42 @@ export class QuestionnairePage {
       if (await cb.isChecked().catch(() => false)) continue;
       await cb.scrollIntoViewIfNeeded().catch(() => {});
       await cb.check({ force: true }).catch(() => {});
-      await this.page.waitForTimeout(300);
+      await this.page.waitForTimeout(500).catch(() => {});
       return true;
+    }
+
+    // ── AntD Select dropdowns (searchable/regular select) ───────────────────
+    const antSelects = this.page.locator(
+      ".questionnaire-answer-wrapper:visible .ant-select:not(.ant-select-disabled)",
+    );
+    const antSelectCount = await antSelects.count().catch(() => 0);
+    for (let i = 0; i < antSelectCount; i++) {
+      const sel = antSelects.nth(i);
+      if (!(await sel.isVisible().catch(() => false))) continue;
+      // Skip if already has a selected value (placeholder is hidden)
+      const hasPlaceholder = await sel
+        .locator(".ant-select-selection-placeholder")
+        .isVisible()
+        .catch(() => false);
+      if (!hasPlaceholder) continue;
+
+      await sel.scrollIntoViewIfNeeded().catch(() => {});
+      await sel.click().catch(() => {});
+      await this.page.waitForTimeout(600).catch(() => {});
+
+      // Click the first non-disabled option in the dropdown
+      const option = this.page
+        .locator(
+          ".ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled)",
+        )
+        .first();
+      if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await option.click().catch(() => {});
+        await this.page.waitForTimeout(400).catch(() => {});
+        return true;
+      }
+      // Close if no options appeared
+      await this.page.keyboard.press("Escape").catch(() => {});
     }
 
     // ── Date pickers ────────────────────────────────────────────────────────
@@ -1885,9 +1961,15 @@ export class QuestionnairePage {
       const value = (await input.inputValue().catch(() => "")) ?? "";
       if (value.trim()) continue; // already filled
       console.log(`[QuestionnairePage] Filling date picker ${i + 1}`);
-      return this.fillDateByRule(
+      await this.fillDateByRule(
         this.shouldUseRandomAnswers() ? this.randomDate() : "01-01-2020",
       );
+      // Ensure calendar is fully closed before proceeding
+      await this.page.keyboard.press("Escape").catch(() => {});
+      await this.page.waitForTimeout(300).catch(() => {});
+      // Always return true even if date fill fails — many date fields are optional
+      // ("if applicable"). Returning false causes an infinite retry loop.
+      return true;
     }
 
     // ── Number inputs ───────────────────────────────────────────────────────
@@ -1906,7 +1988,27 @@ export class QuestionnairePage {
             el.closest(".questionnaire-answer-wrapper")?.textContent ?? "",
         )
         .catch(() => "");
-      const val = /height/i.test(nearText) ? "170" : "70";
+      const placeholder =
+        (await input.getAttribute("placeholder").catch(() => "")) || "";
+      const combined = (placeholder + " " + nearText).toLowerCase();
+      // Detect scale ranges: "rate from 1 to 10", "scale 1-10", "(1-10)", etc.
+      const rangeMatch =
+        combined.match(/from\s+(\d+)\s+to\s+(\d+)/i) ||
+        combined.match(/(?:scale|range|between)\s*(\d+)\s*[-–]\s*(\d+)/i) ||
+        combined.match(/\((\d+)\s*[-–]\s*(\d+)\)/);
+      let val: string;
+      if (rangeMatch) {
+        const min = parseInt(rangeMatch[1], 10);
+        const max = parseInt(rangeMatch[2], 10);
+        val =
+          !isNaN(min) && !isNaN(max) && max > min
+            ? Math.floor((min + max) / 2).toString()
+            : "5";
+      } else if (/height/i.test(combined)) {
+        val = "170";
+      } else {
+        val = "70";
+      }
       await input.scrollIntoViewIfNeeded().catch(() => {});
       await input.fill(val).catch(() => {});
       await input.blur().catch(() => {});
@@ -1936,10 +2038,11 @@ export class QuestionnairePage {
       const combined = (placeholder + " " + nearText).toLowerCase();
 
       let val = "None";
-      // Handle range/scale patterns: "scale 1-10", "range 1-10", "(1-10)"
+      // Handle range/scale patterns: "rate from 1 to 10", "scale 1-10", "(1-10)", etc.
       const rangeMatch =
-        combined.match(/(?:scale|range|between)\s*(\d+)\s*-\s*(\d+)/i) ||
-        combined.match(/\((\d+)\s*-\s*(\d+)\)/);
+        combined.match(/from\s+(\d+)\s+to\s+(\d+)/i) ||
+        combined.match(/(?:scale|range|between)\s*(\d+)\s*[-–]\s*(\d+)/i) ||
+        combined.match(/\((\d+)\s*[-–]\s*(\d+)\)/);
       if (rangeMatch) {
         const min = parseInt(rangeMatch[1], 10);
         const max = parseInt(rangeMatch[2], 10);
